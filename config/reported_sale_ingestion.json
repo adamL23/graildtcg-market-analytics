@@ -1,0 +1,14 @@
+{
+  "source_name": "tcgapi.dev",
+  "include_mode": "ebay_sales",
+  "eligibility_snapshot": "data/raw/tcgapi_sales_discovery/20261118T033626665427Z/eligibility_snapshot.json",
+  "expected_card_count": 481,
+  "credit_safety_buffer": 100,
+  "hard_credit_spend_ceiling": 1100,
+  "estimated_credit_per_card_attempt": 2,
+  "estimated_quota_probe_credit": 1,
+  "max_workers": 4,
+  "max_attempts_per_card": 3,
+  "request_timeout_seconds": 60,
+  "retry_backoff_seconds": [1, 2]
+}

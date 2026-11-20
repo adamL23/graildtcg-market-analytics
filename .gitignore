@@ -1,0 +1,35 @@
+.venv/
+.uv-cache/
+.env
+.env.powerbi
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.log
+
+# Power BI files
+*.pbix
+*.pbit
+
+# Credentials and private keys
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# Database exports and generated datasets
+*.dump
+*.backup
+*.sqlite
+*.db
+*.csv
+*.parquet
+*.jsonl
+
+# Exclude raw and generated datasets
+/data/raw/
+/data/processed/
+/data/exports/
+
+git-preview.txt

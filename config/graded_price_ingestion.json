@@ -1,0 +1,19 @@
+{
+  "source_name": "tcgapi.dev",
+  "currency_code": "USD",
+  "data_label": "Provider-reported eBay sold-price summary; unverified and potentially incomplete.",
+  "include_mode": "ebay",
+  "expected_card_count": 489,
+  "credit_safety_buffer": 100,
+  "coverage_game_slugs": [
+    "pokemon",
+    "pokemon-japan",
+    "one-piece-card-game"
+  ],
+  "source_set_keys": [
+    "tcgapi.dev:set:5500216",
+    "tcgapi.dev:set:1900041",
+    "tcgapi.dev:set:1900209",
+    "tcgapi.dev:set:1100079"
+  ]
+}

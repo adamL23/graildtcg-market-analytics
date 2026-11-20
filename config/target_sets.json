@@ -1,0 +1,109 @@
+{
+  "targets": [
+    {
+      "target_name": "Pitch Black",
+      "game_name": "Pokemon",
+      "game_slug": "pokemon",
+      "game_id": 55,
+      "language_code": "en",
+      "catalog_reference": null,
+      "region_code": null,
+      "tcgapi_set_id": 5500216,
+      "provider_set_name": "ME05: Pitch Black",
+      "canonical_source_set_key": "tcgapi.dev:set:5500216",
+      "reference_url": "https://api.tcgapi.dev/v1/sets/5500216",
+      "expected_card_rows": 124,
+      "resolution_status": "resolved_tcgapi"
+    },
+    {
+      "target_name": "Mega Brave",
+      "game_name": "Pokemon Japan",
+      "game_slug": "pokemon-japan",
+      "game_id": 19,
+      "language_code": "ja",
+      "catalog_reference": null,
+      "region_code": null,
+      "tcgapi_set_id": 1900041,
+      "provider_set_name": "m1L: Mega Brave",
+      "canonical_source_set_key": "tcgapi.dev:set:1900041",
+      "reference_url": "https://api.tcgapi.dev/v1/sets/1900041",
+      "expected_card_rows": 93,
+      "resolution_status": "resolved_tcgapi"
+    },
+    {
+      "target_name": "Mega Symphonia",
+      "game_name": "Pokemon Japan",
+      "game_slug": "pokemon-japan",
+      "game_id": 19,
+      "language_code": "ja",
+      "catalog_reference": null,
+      "region_code": null,
+      "tcgapi_set_id": 1900209,
+      "provider_set_name": "m1S: Mega Symphonia",
+      "canonical_source_set_key": "tcgapi.dev:set:1900209",
+      "reference_url": "https://api.tcgapi.dev/v1/sets/1900209",
+      "expected_card_rows": 92,
+      "resolution_status": "resolved_tcgapi"
+    },
+    {
+      "target_name": "Gem Pack Vol. 6",
+      "game_name": "Pokemon",
+      "game_slug": null,
+      "game_id": null,
+      "language_code": "zh-Hans",
+      "catalog_reference": "CBB6C",
+      "region_code": null,
+      "tcgapi_set_id": null,
+      "provider_set_name": null,
+      "canonical_source_set_key": null,
+      "reference_url": null,
+      "expected_card_rows": null,
+      "resolution_status": "missing_tcgapi_coverage"
+    },
+    {
+      "target_name": "OP-17 English",
+      "game_name": "One Piece Card Game",
+      "game_slug": "one-piece-card-game",
+      "game_id": 11,
+      "language_code": "en",
+      "catalog_reference": "english",
+      "region_code": null,
+      "tcgapi_set_id": 1100079,
+      "provider_set_name": "The World's Strongest Warriors",
+      "canonical_source_set_key": "tcgapi.dev:set:1100079",
+      "reference_url": "https://api.tcgapi.dev/v1/sets/1100079",
+      "expected_card_rows": 180,
+      "resolution_status": "resolved_tcgapi"
+    },
+    {
+      "target_name": "OP-17 Japanese",
+      "game_name": "One Piece Card Game",
+      "game_slug": "one-piece-card-game",
+      "game_id": 11,
+      "language_code": "ja",
+      "catalog_reference": "japanese",
+      "region_code": null,
+      "tcgapi_set_id": null,
+      "provider_set_name": null,
+      "canonical_source_set_key": null,
+      "reference_url": null,
+      "expected_card_rows": null,
+      "resolution_status": "missing_tcgapi_coverage"
+    }
+  ],
+  "coverage_verification": {
+    "verified_at": "2026-11-17",
+    "successful_requests": 11,
+    "failed_requests": 0,
+    "catalog_pages": {
+      "pokemon": 2,
+      "pokemon-japan": 3,
+      "one-piece-card-game": 1
+    },
+    "notes": [
+      "Language is normalized from the provider game namespace; TCGAPI set objects do not expose a language field.",
+      "CBB6C / Gem Pack Vol. 6 was absent from the complete Pokemon and Pokemon Japan set catalogs and returned no authenticated search results.",
+      "Japanese OP-17 was absent from the complete One Piece set catalog; authenticated OP17 searches returned only English base and Release Event catalogs."
+    ]
+  }
+}

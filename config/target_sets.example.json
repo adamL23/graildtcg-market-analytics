@@ -1,0 +1,52 @@
+{
+  "targets": [
+    {
+      "game_name": "Pokemon",
+      "set_name": "Pitch Black",
+      "language_code": "en",
+      "catalog_reference": null,
+      "canonical_source_set_key": null,
+      "resolution_status": "unverified"
+    },
+    {
+      "game_name": "Pokemon",
+      "set_name": "Mega Brave",
+      "language_code": "ja",
+      "catalog_reference": null,
+      "canonical_source_set_key": null,
+      "resolution_status": "unverified"
+    },
+    {
+      "game_name": "Pokemon",
+      "set_name": "Mega Symphonia",
+      "language_code": "ja",
+      "catalog_reference": null,
+      "canonical_source_set_key": null,
+      "resolution_status": "unverified"
+    },
+    {
+      "game_name": "Pokemon",
+      "set_name": "Gem Pack Vol. 6",
+      "language_code": "zh-Hans",
+      "catalog_reference": null,
+      "canonical_source_set_key": null,
+      "resolution_status": "unverified"
+    },
+    {
+      "game_name": "One Piece",
+      "set_name": "OP-17",
+      "language_code": "en",
+      "catalog_reference": "english",
+      "canonical_source_set_key": null,
+      "resolution_status": "unverified"
+    },
+    {
+      "game_name": "One Piece",
+      "set_name": "OP-17",
+      "language_code": "ja",
+      "catalog_reference": "japanese",
+      "canonical_source_set_key": null,
+      "resolution_status": "unverified"
+    }
+  ]
+}

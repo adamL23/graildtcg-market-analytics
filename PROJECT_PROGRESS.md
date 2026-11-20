@@ -1,0 +1,175 @@
+# Project Progress
+
+## Current phase and task
+
+- Phase 1 — Data Foundation
+- Task 1 — Environment and PostgreSQL connection smoke test: complete
+- Task 2 — Dedicated database and restricted application role: complete
+- Task 3 — Revised and verified `sets`, `cards`, and `price_history` schema: complete
+- Task 4 — Language-specific target discovery and TCGAPI catalog ingestion: complete for available provider coverage
+- Task 5 — Canonical TCGAPI price-history ingestion: complete
+- Task 6 — Latest current-market snapshot ingestion: complete
+- Task 7 — Latest cached condition-level pricing ingestion: complete
+- Task 8 — Provider-reported aggregated graded pricing ingestion: complete
+- Task 9 — Provider-reported individual sale-observation ingestion: complete
+- Task 10 — Power BI reporting foundation: complete
+
+## Completed milestones
+
+- Reviewed the project scope, reusable TCG API playground code, and saved datasets.
+- Confirmed Python 3.14.7, Git, VS Code, Power BI Desktop, and PostgreSQL 17 are installed.
+- Confirmed PostgreSQL 17 is configured for `localhost:5432`.
+- Created the project folder structure and Python 3.14 virtual environment.
+- Installed Psycopg 3, python-dotenv, and Requests in the virtual environment.
+- Added validated environment loading and a read-only database smoke-test module.
+- Confirmed PostgreSQL 17 accepts connections on `localhost:5432`.
+- Verified the Python-to-PostgreSQL connection against PostgreSQL 17.2.
+- Verified `current_database() = postgres`, `current_user = postgres`, and `SELECT 1 = 1`.
+- Created the `graildtcg` database owned by `graildtcg_app`.
+- Created `graildtcg_app` without superuser, database-creation, role-creation, or replication privileges.
+- Generated the application password locally, stored it only in the ignored `.env`, and verified the restricted connection.
+- Verified `current_database() = graildtcg`, `current_user = graildtcg_app`, and `SELECT 1 = 1`.
+- Created the empty `cards` and `price_history` tables as `graildtcg_app`.
+- Verified 28 columns, 19 primary-key/unique/foreign-key/check constraints, and zero imported rows.
+- Applied forward migration `002_revise_core_schema.sql` without dropping or recreating tables.
+- Verified 31 columns, 26 constraints, 6 indexes, the card-to-history relationship, and zero imported rows.
+- Passed 11 rollback-only synthetic constraint tests and independently confirmed both tables remained empty.
+- Applied forward migration `003_add_sets_table.sql` without recreating the existing tables.
+- Normalized game, set, language, region, and release metadata into the new `sets` table.
+- Verified 40 columns, 39 constraints, 10 indexes, both foreign-key relationships, and zero imported rows.
+- Passed 20 rollback-only synthetic tests and independently confirmed all three tables remained empty.
+- Applied `004_allow_missing_card_number.sql` after confirming valid provider rows can omit a collector number.
+- Passed 21 rollback-only schema tests, including nullable card-number handling.
+- Resolved and imported four canonical TCGAPI catalogs: Pitch Black, Mega Brave, Mega Symphonia, and OP-17 / The World's Strongest Warriors.
+- Imported 4 set rows and 489 card rows, including the 180-card OP-17 English catalog.
+- Preserved two complete timestamped raw API snapshots and manifests; confirmed they contain no API-key markers.
+- Reran the catalog loader and confirmed idempotent row counts: 4 sets, 489 cards, 0 duplicate provider IDs, 0 orphan cards, and 0 price-history rows.
+- Corrected the OP-17 scope to English and Japanese, verified the complete TCGAPI game/set catalog and live OP17 card searches, and found no separate Japanese edition.
+- Reran the corrected target configuration: English OP-17 remained set `1100079` with 180 cards; Japanese OP-17 was explicitly skipped with no invented provider ID.
+- Checked all 459 `pokemon-japan` set rows across 3 successful pages and verified Mega Brave (`1900041`) and Mega Symphonia (`1900209`) in the Japanese provider catalog.
+- Checked all 219 `pokemon` rows, all 88 One Piece rows, and authenticated searches for OP17, CBB6C, and Gem Pack; all 11 requests succeeded with zero access/authentication/HTTP failures.
+- Classified Gem Pack Vol. 6 and Japanese OP-17 as missing TCGAPI coverage rather than failed requests, retained both unresolved in the allowlist, and reran the four-set/489-card load successfully.
+- Verified that the live bulk-history endpoint enforces a maximum of 50 card IDs per request and configured ten batches for the 489-card catalog.
+- Applied forward migration `005_widen_price_precision.sql` after a pre-write validator caught a four-decimal `market_price`; all three price columns now preserve source values as `NUMERIC(14,4)`.
+- Loaded 117,828 canonical USD price-history observations covering 488 of 489 configured cards and retained exact raw responses plus a completed manifest.
+- Classified OP-17 card `2185531` as provider-omitted/no-history after the individual endpoint returned HTTP 200 with an empty `data` object.
+- Verified per-set history coverage, four printing categories, source/currency mapping, NULL-versus-zero preservation, and zero orphan, duplicate, negative, or conflicting rows.
+- Reran the complete history loader and confirmed idempotency: 0 inserted, 0 revised, 117,828 unchanged, and 117,828 database rows.
+- Verified that existing TCGAPI set-card responses expose the required current-price fields, so Task 6 reuses that endpoint rather than adding a production dependency on another price endpoint.
+- Applied forward migration `006_create_current_prices.sql` with one canonical latest snapshot per card, source, currency, and printing.
+- Loaded 489 current-price snapshots with full coverage across the four available catalogs: 1 market-price NULL, 0 market-price zeroes, and 1 provider stale-market indicator.
+- Separated `market_price_as_of`, `provider_observed_at`, and database `loaded_at` timestamps.
+- Proved that a deliberately older altered observation was skipped and could not replace the newer stored snapshot.
+- Reran the complete current-price loader and confirmed idempotency: 0 inserted, 0 updated, and 489 unchanged.
+- Verified zero current-price orphans, duplicate canonical keys, invalid numeric values, timestamp-order violations, or generated zero-flag mismatches; historical rows remained at 117,828.
+- Verified the live bulk-condition contract before migration: 1,219 unique rows, all 489 cards covered, two listing languages, four printings, and six condition labels including provider-reported `Unopened`.
+- Applied forward migration `007_create_condition_prices.sql` and loaded 1,219 canonical condition snapshots without triggering per-card cache warming.
+- Preserved 345 NULL shipping medians for sample counts below three and confirmed zero median/sample contract anomalies.
+- Verified zero condition-price orphans, duplicate keys, negative values, timestamp violations, or missing cards; current prices remained at 489 and historical prices at 117,828.
+- Proved that an altered older condition observation was skipped without changing its stored hash.
+- Reran the complete condition loader and confirmed idempotency: 0 inserted, 0 updated, and 1,219 unchanged.
+- Saved public eBay coverage for Pokémon, Pokémon Japan, and One Piece, then verified four representative graded responses before finalizing migration `008`.
+- Distinguished 489 requested cards, 481 cards with any eBay data, and 169 cards with actual graded summaries.
+- Calculated a 482-credit bulk projection, confirmed 9,988 credits were available after the quota probe, and completed exactly one full request for the projected 482 credits.
+- Applied `008_create_graded_price_summaries.sql` and loaded 1,264 canonical raw-grade-label summaries from the saved response.
+- Preserved `graded_days` separately from ungraded `days`; all loaded rows had 30 graded coverage days in this snapshot.
+- Preserved 750 NULL 30-day medians separately from 750 historical last sales with zero current-window sales.
+- Replayed the saved raw JSON twice: the first replay inserted 1,264 rows and the second reported 0 inserts, 0 updates, and 1,264 unchanged without another API call.
+- Verified zero graded-summary orphans, duplicate keys, invalid values, future sale dates, or window violations; all prior dataset counts remained unchanged.
+- Proved stale-source protection and rollback-only last-known retention while preserving historical sale fields.
+- Preserved four representative `include=ebay_sales` responses plus one repeated multi-printing response and a frozen 481-card eligibility snapshot.
+- Verified the individual sales schema: date-only sold date, price, best-offer flag, nullable list price, raw grade, raw condition, title, and URL; no currency, sale timestamp, or stable provider sale ID was returned.
+- Compared 314 representative observations with aggregate summaries; all six printing rows reconciled in the sample, the maximum array contained 124 rows, and no pagination or total-count fields were present.
+- Found five duplicate deterministic-fingerprint groups with different URLs, proving that ordinary transaction fields cannot safely define event uniqueness.
+- Confirmed repeated response stability for 50 Pitch Black observations while documenting that URL stability does not prove unique completed-sale identity.
+- Completed the Task 9 execution gate without creating migration `009` or performing the 481-card extraction; projected full cost is 962 credits.
+- Applied `009_create_reported_sale_observations.sql` with immutable source-snapshot replay keys and explicit observation-not-transaction semantics.
+- Completed run `20261118T035224841879Z` for all 481 frozen eligible cards with zero terminal API failures, zero missing sales arrays, and 962 provider-reported card credits.
+- Preserved 481 exact card responses, 12,568 observations, 188 present-but-empty sales arrays, and NULL currency for every row.
+- Recovered two already-saved successful responses after local OneDrive manifest locks and resumed only five requests that had not started; the source snapshot key remained unchanged.
+- Replayed the completed snapshot twice: first load inserted 12,568 rows and second load inserted 0 with 12,568 unchanged.
+- Rejected a deliberately conflicting same-key record hash before any write and verified zero duplicate replay keys, orphans, or invalid rows.
+- Verified prior datasets remain unchanged at 489 cards, 489 current prices, 1,219 condition prices, 1,264 graded summaries, and 117,828 historical prices.
+- Applied `010_create_reporting_views.sql` with one Cards dimension and five market fact views, preserving every operational row grain without aggregation.
+- Pinned the reported-sale fact to completed snapshot `tcgapi.dev:ebay_sales:20261118T035224841879Z`; all 12,568 rows retain NULL currency and unverified-observation semantics.
+- Created and verified the least-privilege `graildtcg_powerbi` login with access only to the six reporting views and no direct operational-table SELECT privilege.
+- Verified reporting counts of 489 cards, 489 current prices, 1,219 condition prices, 1,264 graded summaries, 117,828 historical prices, and 12,568 sale observations, with zero orphan facts.
+- Built the Power BI Desktop Import model with five active one-to-many, single-direction Cards-to-fact relationships and no fact-to-fact relationships.
+- Set all 14 raw price fields to `Don't summarize`, completed a manual refresh without errors, and saved `GraildTCG Market Analytics Dashboard.pbix` in the project root.
+
+## Technical decisions
+
+- Use PostgreSQL 17; leave the separate PostgreSQL 13 installation unchanged.
+- Use Psycopg 3 and a project-local virtual environment.
+- Keep credentials in an untracked `.env` file.
+- Keep live API access separate from offline JSON/database loading.
+- Use a dedicated database owner/login for application work; reserve `postgres` for administration.
+- Use TCG API card ID as the stable source identity and an internal `card_id` for relationships.
+- Store prices as exact `NUMERIC(14, 4)` values and preserve source nulls; four
+  decimal places are required by verified TCGAPI history observations.
+- Store one canonical observation per card, provider, printing, currency, and observation date.
+- Use `source_record_hash` for change detection; ETL will update a revised canonical row while retaining the raw response and logging the revision.
+- Keep `variant_name` as optional normalized card identity metadata and `printing` as the provider's price category.
+- Require explicit provider and currency metadata; file path and row number provenance remain optional for direct API ingestion.
+- Model `sets (1) -> cards (many) -> price_history (many)` using internal database identities.
+- Use `(source_name, tcgapi_set_id)` for non-null provider set IDs and `(source_name, source_set_key)` as the stable identity for every set.
+- Store language and region separately; use language codes such as `en`, `ja`, and `zh-Hans` without embedding a region.
+- Keep the target-set allowlist in external configuration rather than hardcoding it in the database schema.
+- Fetch only `product_type=Cards` during the catalog checkpoint; sealed products are excluded.
+- Preserve valid provider cards with missing collector numbers as SQL `NULL`.
+- Deduplicate multiple regional references that resolve to the same canonical TCGAPI set before API retrieval and loading.
+- Treat OP-17 English and Japanese as separate language targets; never substitute the English Asia or Release Event catalog for Japanese.
+- Normalize set language from the verified provider game namespace because TCGAPI set objects do not expose a language field directly.
+- Map the default TCGAPI history endpoint explicitly to TCGPlayer-sourced USD observations; do not infer currency from the response because it exposes no currency field.
+- Preserve exact raw history responses and normalized SHA-256 hashes; update only genuinely revised canonical observations and never delete older observations omitted by a later response.
+- Treat a successful bulk-history response that omits a valid requested card as provider-omitted/no-history and record the ID in the run manifest.
+- Use up to four concurrent read-only history requests and PostgreSQL `COPY` into a transaction-local staging table before the canonical upsert.
+- Reuse `GET /sets/{id}/cards` for current snapshots because its verified card objects already contain market, low, median, shipping-inclusive, listing, printing, and provider-time fields.
+- Store current price numerics as `NUMERIC(30,16)` to preserve the exact provider JSON, including a verified shipping-inclusive floating-point artifact, while raw responses remain the source evidence.
+- Order current snapshots by the provider's `price_updated_at`, not by ingestion time; allow same-timestamp revisions by hash and reject older observations.
+- Keep a generated `market_price_is_zero` analytical flag while preserving the original market price as NULL, zero, or a positive value.
+- Use the bulk condition cache for Task 7 and keep `warm_missing_cards=false`; per-card refresh allowances are not consumed automatically.
+- Store one latest condition snapshot per card, source, currency, printing, condition, and listing language, ordered by the provider's `last_updated_at`.
+- Preserve provider condition labels as validated text because live data includes `Unopened` beyond the five standard condition labels.
+- Treat condition `sample_count` as sampled listings rather than total market depth and preserve a NULL median when the provider has insufficient samples.
+- Separate graded extraction from loading: make a quota-gated full API request once, then replay the saved raw response for implementation fixes and idempotency tests.
+- Treat general eBay coverage and actual graded-summary coverage as different metrics.
+- Use `graded_days` for graded-window completeness and retain ungraded `days` only as separate provider context.
+- Preserve nullable graded 30-day medians independently from historical last-sale price and date.
+- Retain raw provider grade labels and defer grader/grade normalization to the post-MVP backlog.
+- Mark summaries absent from a newer snapshot as last-known rather than deleting them or presenting them as current rolling valuations.
+- Model Task 9 records as source-snapshot sale observations unless stronger provider identity evidence becomes available; do not claim cross-snapshot event uniqueness.
+- Keep currency nullable for individual sale observations because the verified response exposes no currency field.
+- Use the frozen Task 8 eligibility snapshot for the first sales extraction and report later coverage changes without silently altering scope.
+- Use `(source_snapshot_key, card_id, printing, source_row_number)` as the immutable Task 9 replay key; row numbers are one-based within one card-and-printing sales array.
+- Treat Task 9 rows as source observations, never verified unique transactions, and require dashboards to select one completed snapshot.
+- Keep Task 9 rows insert-only; reject same-key hash conflicts instead of revising an immutable snapshot.
+- Enforce both provider quota headroom and a 1,100-credit hard ceiling with pessimistic reservation for every attempt.
+- Expose operational datasets to Power BI only through documented-grain reporting views and a dedicated view-only login.
+- Keep the Power BI model as a star schema with Cards filtering each fact in one direction; do not introduce fact-to-fact relationships.
+- Pin reported-sale reporting to one explicitly completed extraction snapshot and advance it only through a reviewed forward migration.
+- Set raw price columns to `Don't summarize`; later DAX measures must define intentional aggregation and currency context.
+
+## Known issues
+
+- The generic Windows `python` alias does not launch the installed runtime; project commands use `.venv\Scripts\python.exe`.
+- TCGAPI.dev history responses do not expose a currency field; the Task 5 configuration therefore carries the verified USD mapping explicitly.
+- The live bulk-history endpoint enforces 50 IDs per request, even though an earlier provider reference described a 100-ID maximum.
+- TCGAPI.dev does not expose a dedicated `variant_name` field. Any normalized Parallel/Alternate Art label must be derived transparently from identity metadata during ETL.
+- The active `target_sets.json` contains the verified TCGAPI mappings; `target_sets.example.json` remains an unresolved configuration example only.
+- Pokémon Gem Pack Vol. 6 is not present in TCGAPI.dev. A saved Pokewallet reference exists (`CBB6C`, Simplified Chinese), but using Pokewallet for ingestion requires an explicit second-provider decision.
+- TCGAPI.dev currently exposes no separate Japanese OP-17 game or set. English OP-17 is set `1100079`; English Release Event set `1100086` is not a Japanese substitute.
+- Current-price responses can retain a last market value while `no_market_price_since` marks it stale; dashboards must show freshness rather than treating every non-null value as current.
+- One saved `lowest_with_shipping` value contains a provider floating-point artifact (`1.6099999999999999`); Task 6 preserves it exactly and defers analytical rounding to the reporting layer.
+- Bulk condition coverage is cache-dependent and may omit cards in a future run even though the completed Task 7 snapshots covered all 489 cards; omitted rows are retained and reported rather than deleted.
+- Condition shipping-inclusive values also contain provider floating-point artifacts; Task 7 preserves them exactly as `NUMERIC(30,16)`.
+- Graded summaries are provider-reported eBay aggregates and remain unverified; low sales volume, incomplete future windows, matching errors, and raw label inconsistencies require cautious presentation.
+- General eBay coverage is high for the loaded sets, but only 169 of 489 cards had actual graded summaries in the Task 8 snapshot.
+- Individual eBay sale records expose no documented stable sale ID, pagination, total count, currency, or time-of-day; URLs are stable source evidence but are not proven event identifiers.
+- OneDrive can briefly lock an atomic manifest rename; the extractor now retries that local operation and recovers already-saved HTTP 200 responses without re-requesting them.
+- Power BI displays imported schema-qualified view names with spaces rather than PostgreSQL dots; the `dim_` and `fact_` prefixes keep table roles unambiguous.
+- Power BI Service, gateway configuration, scheduled refresh, and production dashboard visuals are not configured in Task 10.
+
+## Next task
+
+- Task 10 is complete. Define and approve Task 11 before adding dashboard visuals, DAX KPIs, Power BI Service deployment, scheduled refreshes, or new provider calls. Scraping, seller analytics, marketplace features, cross-snapshot transaction deduplication, and transaction-quality scoring remain out of scope.

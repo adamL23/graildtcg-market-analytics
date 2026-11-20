@@ -1,0 +1,15 @@
+{
+  "source_name": "tcgapi.dev",
+  "currency_code": "USD",
+  "currency_basis": "TCGAPI default history is TCGPlayer-sourced; Cardmarket uses a separate EUR endpoint.",
+  "history_range": "all",
+  "batch_size": 50,
+  "max_workers": 4,
+  "expected_card_count": 489,
+  "source_set_keys": [
+    "tcgapi.dev:set:5500216",
+    "tcgapi.dev:set:1900041",
+    "tcgapi.dev:set:1900209",
+    "tcgapi.dev:set:1100079"
+  ]
+}

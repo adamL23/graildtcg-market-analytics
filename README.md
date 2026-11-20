@@ -1,304 +1,179 @@
-# GraildTCG Market Analytics Dashboard
+# GraildTCG — Market Data Engineering & Analytics
 
-Local learning project for loading TCG API data into PostgreSQL and analysing it in Power BI.
+**Python · PostgreSQL · SQL · REST APIs · Power BI**
 
-## Task 1: database connection smoke test
+GraildTCG is an ongoing project with a long-term goal of building a **web-based trading card game (TCG) market intelligence platform**. The envisioned application will help collectors, sellers, and other market participants explore pricing data, historical trends, and product comparisons.
 
-From Windows PowerShell in this directory:
+This repository documents **Phase 1: the market-data engineering and analytics foundation**. A local Python pipeline ingests catalog and pricing observations from TCGAPI.dev, validates and stores them in PostgreSQL, and exposes curated SQL views to an interactive Power BI dashboard. This phase emphasizes **reproducible ingestion, data integrity, provenance, and explicit handling of incomplete provider data**.
 
-```powershell
-Copy-Item .env.example .env
-# Edit .env and replace PGPASSWORD with the local PostgreSQL password.
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe -m gmad.smoke_test
+> **Project status:** Phase 1 ingestion, database modeling, and Power BI reporting are implemented locally. The web application is **planned, not yet built**. Automated scheduling, cloud deployment, and sealed-product ingestion are also future work. Data is provider-reported and should not be interpreted as verified financial-market or transaction data.
+
+## Project vision and scope
+
+The Power BI dashboard is an **analytical prototype**, used to explore the collected data and validate the pricing and reporting model before building a user-facing application.
+
+| Stage | Scope | Status |
+| --- | --- | --- |
+| **Phase 1 — Data engineering & analytics** | API ingestion, normalized PostgreSQL storage, validation, historical prices, reporting views, and Power BI exploration | **Implemented locally** |
+| **Future — Market intelligence web app** | Web-based card and product discovery, interactive pricing trends, comparisons, and market insights | **Planned** |
+
+Future application capabilities are product goals, **not current repository features**. The existing pipeline provides a foundation that can be extended with a backend API and web frontend once data coverage, operations, and architecture are validated.
+
+## Dashboard preview
+
+![GraildTCG Power BI market analytics dashboard](docs/images/graildtcg-dashboard.png)
+
+The dashboard provides Game / Set / Card selection, current market price, 30-day historical price change, selectable price-history periods, condition-based pricing, graded-price comparisons, and recent provider-reported eBay sales. The sale-observation source does **not** supply verified currency; the dashboard labels that limitation rather than assuming USD.
+
+> Screenshot is a sample of the local report. The Power BI `.pbix` and private local connection settings are intentionally not committed.
+
+## Architecture
+
+```text
+                 TCGAPI.dev REST APIs
+                (catalog + market feeds)
+                          |
+                          v
+               Python extraction layer
+            (validation, quota/retry checks)
+                          |
+                  +-------+-------+
+                  |               |
+                  v               v
+         Local raw snapshots    ETL normalization
+         + run manifests       + record hashing
+          (Git-ignored)              |
+                                     v
+                            PostgreSQL tables
+                          (constraints + upserts)
+                                     |
+                                     v
+                       Read-only reporting views
+                          (dim_cards + 5 facts)
+                                     |
+                                     v
+                          Power BI (Import mode)
 ```
 
-Expected output identifies the PostgreSQL server, database, user, and prints `SELECT 1: 1`.
-No database tables are created by this command.
+Raw API responses and run manifests remain available locally for audit and offline replay, but are excluded from the public repository.
 
-## Task 2: dedicated database and role
+## Engineering highlights
 
-The one-time bootstrap creates the `graildtcg` database and the restricted
-`graildtcg_app` login. It generates the application password locally, does not
-print it, and switches `.env` from the bootstrap superuser to the application login.
+| Area | Implementation |
+| --- | --- |
+| **Ingestion** | Python clients and task-specific scripts for catalogs, history, current prices, condition prices, graded summaries, and reported sales |
+| **Data modeling** | Normalized `sets → cards → price_history` entities; independent current/condition/graded/sale data structures |
+| **Integrity** | PostgreSQL keys, constraints, canonical uniqueness, numeric precision, validation and explicit `NULL` handling |
+| **Reliability** | Replay-safe upserts, SHA-256 source-record hashes, timestamp-aware snapshot updates, bounded retries and quota controls |
+| **Traceability** | Timestamped source responses and manifests; distinction between missing provider coverage, empty values and request failures |
+| **Analytics** | Six read-only reporting views; one-to-many, single-direction Power BI relationships; market and historical price measures |
+| **Access control** | Restricted application login and a separate least-privilege Power BI read-only role |
 
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\bootstrap_database.py
-.\.venv\Scripts\python.exe -m gmad.smoke_test
+### Data coverage
+
+The initial loaded catalog covers **489 cards** across four available set catalogs. The Phase 1 dataset includes **more than 117,000 historical price observations**. Provider availability differs by set, card, feed, and region; missing coverage is reported rather than silently filled.
+
+The initial target scope includes Pokémon English and Japanese sets and One Piece English. Some requested regional catalogs (including Japanese OP-17) were not independently available through the provider during discovery; see [set coverage findings](docs/TASK4_SET_COVERAGE.md).
+
+### Important data semantics
+
+- **Current snapshots vs. history:** Current-price data is timestamp-guarded; older provider observations cannot overwrite newer data. History uses a canonical card/provider/printing/currency/date identity.
+- **Zero vs. missing:** Provider zero values and SQL `NULL` are preserved distinctly. Report measures can exclude zero-valued prices where they would distort a visualization.
+- **Graded prices:** These are aggregated, provider-reported sold-price summaries; missing 30-day medians are not backfilled from unrelated fields.
+- **Reported eBay sales:** Individual records are observations, *not* globally unique verified transactions. Replay identity is snapshot-specific, and different snapshots must not be summed as separate real-world sales.
+- **Currency:** Verified pricing feeds are mapped according to endpoint metadata; individual eBay sale observations retain unknown currency when the source does not specify it.
+
+## Repository structure
+
+```text
+config/       Ingestion configurations and example set allowlists
+src/gmad/     Python extraction, validation, and loading modules
+scripts/      Database bootstrap, sync commands, role configuration
+sql/          Forward migrations, integrity tests, verification, reporting views
+docs/         Implementation evidence and technical reports
+docs/learning/  Guided engineering walkthrough and exercises
+docs/images/ Dashboard preview
+requirements.txt
+.env.example  Environment variable template (no real credentials)
 ```
 
-The bootstrap refuses to change pre-existing database or role objects with the
-same names. Run it only once.
+## Run locally (Windows / PowerShell)
 
-## Task 3: core schema
+**Prerequisites:** Python virtual environment, local PostgreSQL instance, and your own TCGAPI.dev API credentials. The pipeline runs locally; some extraction operations consume provider API credits. See the [environment and architecture walkthroughs](docs/learning/README.md) for context.
 
-The original `001` migration is the applied baseline. Forward-only migrations
-`002` and `003` revise and normalize that empty schema without dropping or
-recreating existing tables.
+1. Create the local environment file and install dependencies using your preferred Python environment:
 
-For a database where `001` and `002` are already applied, apply `003`, run the
-expanded read-only verification, then execute the synthetic constraint tests
-(the test file ends with `ROLLBACK`):
+   ```powershell
+   Copy-Item .env.example .env
+   # Fill .env with your own local credentials; do not commit it.
+   python -m venv .venv
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+   $env:PYTHONPATH = (Resolve-Path .\src)
+   ```
 
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\003_add_sets_table.sql
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_core_schema.sql --read-only
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\test_core_constraints.sql
-```
+2. Test the database connection, then bootstrap the dedicated database/application role as described in the project guide:
 
-The normalized relationship is `sets (1) -> cards (many) -> price_history
-(many)`. `cards.set_id` is the GraildTCG internal foreign key; provider set ID,
-game, language, region and release metadata live once in `sets`.
+   ```powershell
+   .\.venv\Scripts\python.exe -m gmad.smoke_test
+   .\.venv\Scripts\python.exe .\scripts\bootstrap_database.py
+   ```
 
-`sets.source_set_key` is a stable ETL/configuration identity, not a provider
-field. It prevents name-only matching and provides an identity when no TCGAPI.dev
-set ID exists. The example target allowlist is kept separately in
-`config/target_sets.example.json`. Unverified regional catalog references must be
-resolved to a canonical key before ETL creates set or card records.
+   **Bootstrap is a one-time operation.** It refuses to change existing database or role objects with the same names. Review the current `.env.example` and [original setup guidance](docs/learning/03_ENVIRONMENT_SETUP.md) before running it.
 
-`cards.tcgapi_card_id` is the stable provider identity. `price_history.card_id`
-is a foreign key to the internal card identity. `variant_name` is an optional,
-normalized card-identity label; `printing` is the provider's price category.
+3. Apply forward-only SQL migrations in order (`sql/001_...` through `sql/010_...`), using the migration instructions documented in [database and SQL](docs/learning/04_DATABASE_AND_SQL.md) and the individual task reports. Do **not** rerun already-applied schema migrations indiscriminately.
 
-One canonical historical row is stored per card, provider, printing, currency,
-and observation date. If a provider revises that date, ETL will compare
-`source_record_hash` and update the canonical row. The raw response and ETL log
-must record the change; full revision-history tables are deferred beyond Phase 1.
+4. Run only the ingestion workflows you intend to test; for example, once the core schema and provider IDs are configured:
 
-### Validation boundary
+   ```powershell
+   .\.venv\Scripts\python.exe .\scripts\sync_target_catalogs.py
+   .\.venv\Scripts\python.exe .\scripts\sync_price_history.py
+   ```
 
-PostgreSQL enforces required values, keys and relationships, nonblank provider
-labels, positive identifiers, nonnegative numeric values, uppercase three-letter
-currency codes, SHA-256 format, and canonical daily uniqueness.
+   Run the verification SQL with the SQL runner:
 
-Python ETL will validate response shapes, parse dates and decimals, map the
-provider and currency from verified endpoint metadata, derive optional identity
-variants, normalize hashes, retain raw responses, and log provider revisions.
-Missing numerical fields remain `NULL`; Python must not replace them with zero.
+   ```powershell
+   .\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_price_history_load.sql --read-only
+   ```
 
-## Task 4: target-set catalog ingestion
+   For graded summaries and reported sales, prefer offline `--replay-run` when validating ingestion. `--fetch` may consume API credits; review the budget/quota checks in the relevant task reports first.
 
-`config/target_sets.json` holds provider resolutions separately from the schema.
-Regional references that resolve to the same canonical TCGAPI set key are fetched
-and loaded once. Unresolved or unavailable targets are reported and skipped.
+5. Configure the Power BI reporting role after the reporting migration:
 
-OP-17 English resolves to TCGAPI set `1100079` (`The World's Strongest
-Warriors`). TCGAPI.dev currently exposes no separately identifiable Japanese
-OP-17 game/set catalog; that target remains configured with no provider ID and is
-skipped. Set `1100086` is the English Release Event catalog and is not treated as
-a Japanese edition.
+   ```powershell
+   .\.venv\Scripts\python.exe .\scripts\configure_power_bi_role.py
+   .\.venv\Scripts\python.exe .\scripts\configure_power_bi_role.py --verify-only
+   ```
 
-The complete language-specific discovery results, page counts, request outcomes,
-and missing-coverage classification are recorded in
-`docs/TASK4_SET_COVERAGE.md`.
+   Connect Power BI Desktop in **Import** mode to the six read-only `reporting` views, following [Power BI model notes](docs/TASK10_POWER_BI_MODEL.md). The `.pbix` file is not distributed in this repository.
 
-The loader requests only `type=Cards`; sealed products are outside this checkpoint.
-Each provider response is preserved under a timestamped `data/raw/tcgapi` run
-directory before the validated rows are upserted in one database transaction.
+**Note:** The steps above are an orientation, not a one-command installer. Follow the linked migration/task documentation for the exact starting database state, prerequisites and API-credit implications.
 
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\004_allow_missing_card_number.sql
-.\.venv\Scripts\python.exe .\scripts\sync_target_catalogs.py
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_catalog_load.sql --read-only
-```
+## Technical documentation
 
-The project `.env` must contain `TCGAPI_KEY`. The key is never written to raw
-snapshots, manifests, logs, or database rows.
+- [Set coverage and provider limitations](docs/TASK4_SET_COVERAGE.md)
+- [Price-history pipeline](docs/TASK5_PRICE_HISTORY_REPORT.md)
+- [Current-price snapshots](docs/TASK6_CURRENT_PRICE_REPORT.md)
+- [Condition-level prices](docs/TASK7_CONDITION_PRICE_REPORT.md)
+- [Graded price summaries](docs/TASK8_GRADED_PRICE_REPORT.md)
+- [Reported sale ingestion and caveats](docs/TASK9_REPORTED_SALES_REPORT.md)
+- [Power BI reporting model](docs/TASK10_POWER_BI_MODEL.md)
+- [End-to-end engineering learning guide](docs/learning/README.md)
+- [Planned post-MVP improvements](POST_MVP_IMPROVEMENTS.md)
 
-## Task 5: canonical price-history ingestion
+## Next improvements
 
-The history loader requests TCGAPI.dev's bulk history endpoint in batches of at
-most 50 cards, matching the live endpoint's enforced limit. Four read-only
-requests may run concurrently; validated rows then use a temporary PostgreSQL
-`COPY` stage before the canonical upsert. Its default history endpoint is
-TCGPlayer-sourced, so Task 5 maps
-these observations explicitly to `USD`; the separate Cardmarket endpoint is not
-used. Provider `NULL` values remain SQL `NULL` and are never converted to zero.
+**Toward the market intelligence web app**
 
-Each exact response and a run manifest are retained in a timestamped
-`data/raw/tcgapi_history` directory. A normalized SHA-256 hash distinguishes new,
-unchanged, and revised canonical observations. Revised rows are updated, while
-older database observations absent from a later response are retained.
-The live endpoint can return HTTP 200 with no map entry for a valid card that has
-no history; those IDs are recorded in the manifest as provider-omitted and are
-counted as cards without history, not as request failures.
+- Design a backend API to expose curated market data to a future frontend.
+- Prototype a web experience for card discovery, price-history exploration, and product comparisons.
+- Validate sealed-product coverage and data modeling before adding product-category comparisons.
 
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\005_widen_price_precision.sql
-.\.venv\Scripts\python.exe .\scripts\sync_price_history.py
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_price_history_load.sql --read-only
-```
+**Strengthening the data platform**
 
-Migration `005` widens the three price columns from `NUMERIC(12,2)` to
-`NUMERIC(14,4)`. The live history feed includes four-decimal values, so this
-forward-only change prevents PostgreSQL from silently rounding source data while
-retaining the original ten-digit integer capacity.
+- Schedule and monitor incremental ingestion runs, with alerting and failure recovery.
+- Introduce automated CI checks and more repeatable environment setup.
+- Evaluate cloud deployment and incremental refresh.
 
-Run the loader a second time to verify idempotency: an unchanged provider
-snapshot should report zero inserted or revised rows.
+## Security and attribution
 
-## Task 6: current market snapshots
-
-The current-price loader reuses the existing TCGAPI set-card endpoint because
-those card responses already contain the required current-price fields. It does
-not depend on a separate current-price endpoint. One latest snapshot is stored
-per card, provider, currency, and printing.
-
-`market_price_as_of` is the provider's date for the market-price value,
-`provider_observed_at` maps the provider's `price_updated_at` timestamp, and
-`loaded_at` records database ingestion. An incoming observation can update a row
-only when its provider timestamp is newer, or when the provider revises data at
-the same timestamp. Older observations cannot overwrite newer snapshots.
-
-Provider `NULL` and zero values are preserved. `market_price_is_zero` flags a
-reported zero for later analytical review without interpreting it as a genuine
-zero-dollar valuation. Exact raw responses and a run manifest are retained under
-`data/raw/tcgapi_current`.
-
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\006_create_current_prices.sql
-.\.venv\Scripts\python.exe .\scripts\sync_current_prices.py
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_current_price_load.sql --read-only
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\test_current_price_constraints.sql
-```
-
-Run the loader a second time to confirm that an unchanged provider snapshot
-reports zero inserts or updates.
-
-## Task 7: condition-level pricing snapshots
-
-The condition-price loader uses `GET /v1/bulk/conditions` for all 489 configured
-cards in one cache-only request. It does not call the per-card endpoint and does
-not warm missing cache entries. Provider-omitted cards are recorded as missing
-condition coverage rather than being interpreted as cards with no listings.
-
-One latest row is stored per card, provider, currency, printing, condition, and
-listing language. `provider_observed_at` maps the provider's `last_updated_at`,
-while `loaded_at` records database ingestion. Newer observations and documented
-same-timestamp revisions can update a row; older observations are skipped.
-
-Condition labels remain validated provider text rather than a hard-coded enum.
-The live response includes `Unopened` in addition to the five standard card
-conditions. `sample_count` is the number of sampled listings, not total market
-depth, and `median_with_shipping` is normally NULL below three samples.
-
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\007_create_condition_prices.sql
-.\.venv\Scripts\python.exe .\scripts\sync_condition_prices.py
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_condition_price_load.sql --read-only
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\test_condition_price_constraints.sql
-```
-
-Run the loader a second time to confirm that an unchanged provider cache reports
-zero inserts or updates.
-
-## Task 8: provider-reported graded price summaries
-
-Task 8 stores aggregated graded eBay sold-price summaries and labels them as
-provider-reported, unverified, and potentially incomplete. It does not ingest
-individual sold listings.
-
-The workflow deliberately separates extraction from loading. `--fetch` checks
-public set coverage, calculates projected credits, performs a quota probe, and
-makes one full `include=ebay` bulk request only when the projected cost plus a
-safety buffer fits. It saves raw JSON but does not write graded rows. Subsequent
-`--replay-run` commands perform ETL entirely from that saved response and consume
-no API credits.
-
-Coverage metrics remain distinct: cards requested, cards with any eBay data, and
-cards with actual graded summaries. `graded_days` measures the graded rolling
-window; ungraded `days` is retained separately and is never substituted.
-`median_30d` remains nullable independently of historical `last_sale_price` and
-`last_sold_date`.
-
-Rows absent from a newer accepted snapshot are retained with
-`is_reported_in_latest_snapshot = false`. They are last-known observations, not
-current 30-day valuations.
-
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\008_create_graded_price_summaries.sql
-
-# Credit-consuming extraction: run once after reviewing the quota projection.
-.\.venv\Scripts\python.exe .\scripts\sync_graded_prices.py --fetch
-
-# Replace RUN_ID with the fetch output. These commands make no API calls.
-.\.venv\Scripts\python.exe .\scripts\sync_graded_prices.py --replay-run RUN_ID
-.\.venv\Scripts\python.exe .\scripts\sync_graded_prices.py --replay-run RUN_ID
-
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_graded_price_load.sql --read-only
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\test_graded_price_constraints.sql
-```
-
-Do not repeat `--fetch` merely to test idempotency; replay the preserved raw run.
-
-## Task 9: provider-reported sale observations
-
-Task 9 stores individual provider-returned eBay sale observations without
-claiming that they are globally unique marketplace transactions. The immutable
-replay key is source snapshot, internal card, printing, and the deterministic
-one-based position in that printing's sales array. A conflicting hash for an
-existing replay key is a data-integrity error; stored observations are never
-silently overwritten.
-
-Extraction is resumable and keeps one snapshot key across resumes. Successful
-raw card responses are saved immediately and never requested again. The workflow
-enforces provider quota headroom, a configurable hard credit ceiling, four-worker
-concurrency, and bounded retries. Currency remains NULL because the verified
-response supplies no sale currency.
-
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\009_create_reported_sale_observations.sql
-
-# Credit-consuming extraction: start once, then resume the same run if needed.
-.\.venv\Scripts\python.exe .\scripts\sync_reported_sales.py --fetch
-.\.venv\Scripts\python.exe .\scripts\sync_reported_sales.py --resume-run RUN_ID
-
-# Offline-only, idempotent database replay.
-.\.venv\Scripts\python.exe .\scripts\sync_reported_sales.py --replay-run RUN_ID
-.\.venv\Scripts\python.exe .\scripts\sync_reported_sales.py --replay-run RUN_ID
-
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_reported_sale_load.sql --read-only
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\test_reported_sale_constraints.sql
-```
-
-Dashboard queries must choose a completed snapshot explicitly. They must not add
-observations across multiple extraction snapshots as though each row were a new
-real-world sale.
-
-## Task 10: Power BI reporting foundation
-
-Migration `010_create_reporting_views.sql` creates a lightweight `reporting`
-schema with one Cards dimension and five unaggregated market fact views. The
-reported-sale view is pinned to completed snapshot
-`tcgapi.dev:ebay_sales:20261118T035224841879Z`; observations from different
-extractions are never combined automatically.
-
-Power BI uses the dedicated `graildtcg_powerbi` login in Import mode. That role
-can select only the six reporting views and cannot directly query operational
-tables. Its generated local credential is stored in ignored `.env.powerbi`.
-
-```powershell
-$env:PYTHONPATH = (Resolve-Path .\src)
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\010_create_reporting_views.sql
-.\.venv\Scripts\python.exe .\scripts\configure_power_bi_role.py
-.\.venv\Scripts\python.exe .\scripts\run_sql_file.py .\sql\verify_reporting_views.sql --read-only
-.\.venv\Scripts\python.exe .\scripts\configure_power_bi_role.py --verify-only
-```
-
-The saved Power BI model uses active one-to-many, single-direction relationships
-from `reporting.dim_cards[card_id]` to each fact. All raw price fields default to
-`Don't summarize`. Full connection, view-grain, relationship, row-count, and
-manual-refresh results are documented in `docs/TASK10_POWER_BI_MODEL.md`.
-
-## Security
-
-`.env` is excluded by `.gitignore`. Do not commit database or API credentials.
-
+API keys and local database passwords belong in ignored `.env` files and must never be committed. Raw source payloads and database exports are likewise kept out of Git. TCGAPI.dev and trading-card artwork belong to their respective owners; this repository is an independent educational/portfolio implementation and an early stage of a proposed product, not an operating marketplace or pricing authority.

@@ -33,3 +33,6 @@ secrets.json
 /data/exports/
 
 git-preview.txt
+
+# Ignore unrelated JPEG files in project root
+/*.jpeg
